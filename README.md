@@ -1,7 +1,7 @@
 [![windows](https://github.com/renatus-novus-x/udp_duplex/workflows/windows/badge.svg)](https://github.com/renatus-novus-x/udp_duplex/actions?query=workflow%3Awindows)
 [![macos](https://github.com/renatus-novus-x/udp_duplex/workflows/macos/badge.svg)](https://github.com/renatus-novus-x/udp_duplex/actions?query=workflow%3Amacos)
 [![ubuntu](https://github.com/renatus-novus-x/udp_duplex/workflows/ubuntu/badge.svg)](https://github.com/renatus-novus-x/udp_duplex/actions?query=workflow%3Aubuntu)
-
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/renatus-novus-x/udp_duplex)
 # udp_duplex
 
 Cross-platform UDP ping-pong sample for:
@@ -40,3 +40,10 @@ and prints everything it receives.
 
 This is intended as a minimal starting point before replacing the
 `"hello <counter>"` payload with ADPCM / PCM audio frames for VoIP experiments.
+
+## Download
+
+- [udp_duplex.exe (windows)](https://raw.githubusercontent.com/renatus-novus-x/udp_duplex/main/bin/windows/udp_duplex.exe)
+- [udp_duplex     (macos)](https://raw.githubusercontent.com/renatus-novus-x/udp_duplex/main/bin/macos/udp_duplex)
+- [udp_duplex     (ubuntu)](https://raw.githubusercontent.com/renatus-novus-x/udp_duplex/main/bin/ubuntu/udp_duplex)
+- [udp_duplex.x   (x68000)](https://raw.githubusercontent.com/renatus-novus-x/udp_duplex/main/bin/x68000/udp_duplex.x)
