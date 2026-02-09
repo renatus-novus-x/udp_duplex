@@ -86,9 +86,20 @@ static void tiny_sleep(void)
 int main(int argc, char **argv)
 {
   if (argc != 4) {
+    const char *prog = argv[0];
+    const char *slash = strrchr(prog, '/');
+#if defined(_WIN32)
+    const char *bslash = strrchr(prog, '\\');
+    if (bslash && (!slash || bslash > slash)) {
+      slash = bslash;
+    }
+#endif
+    if (slash) {
+      prog = slash + 1;
+    }
     fprintf(stderr,
             "Usage: %s <local_port> <peer_ip> <peer_port>\n",
-            argv[0]);
+            prog);
     return 1;
   }
 
