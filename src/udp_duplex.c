@@ -44,6 +44,10 @@ typedef int sock_t;
 #define SOCKET_ERROR (-1)
 #endif
 
+/* Set socket to non-blocking mode on PC side.
+ * On X68000 (elf2x68k + libsocket), we do not rely on O_NONBLOCK
+ * and instead poll with SO_SOCKLENRECV, so this function is a no-op.
+ */
 static int set_nonblock(sock_t s)
 {
 #if defined(_WIN32)
@@ -51,6 +55,11 @@ static int set_nonblock(sock_t s)
   if (ioctlsocket(s, FIONBIO, &mode) != 0) {
     return -1;
   }
+  return 0;
+#else
+  /* X68000 / Human68k: do not change flags, use SO_SOCKLENRECV instead */
+#if defined(__human68k__)
+  (void)s;
   return 0;
 #else
   int flags;
@@ -65,12 +74,12 @@ static int set_nonblock(sock_t s)
   }
   return 0;
 #else
-  /* If fcntl/O_NONBLOCK is not available, we just keep it blocking. */
   (void)s;
   return 0;
-#endif
+#endif /* O_NONBLOCK */
 
-#endif
+#endif /* __human68k__ */
+#endif /* _WIN32 */
 }
 
 static void tiny_sleep(void)
@@ -85,7 +94,12 @@ static void tiny_sleep(void)
 
 int main(int argc, char **argv)
 {
+  /* Flush stdout/stderr immediately (important on X68000) */
+  setvbuf(stdout, NULL, _IONBF, 0);
+  setvbuf(stderr, NULL, _IONBF, 0);
+
   if (argc != 4) {
+    /* Strip directory from argv[0] for nicer usage text */
     const char *prog = argv[0];
     const char *slash = strrchr(prog, '/');
 #if defined(_WIN32)
@@ -168,7 +182,7 @@ int main(int argc, char **argv)
 
   if (set_nonblock(sock) != 0) {
     fprintf(stderr,
-            "Warning: failed to set non-blocking mode, using blocking socket.\n");
+            "Warning: failed to set non-blocking mode, using blocking socket (or SO_SOCKLENRECV).\n");
   }
 
   printf("Local  : port %d\n", local_port);
@@ -184,23 +198,61 @@ int main(int argc, char **argv)
     for (;;) {
       struct sockaddr_in from_addr;
       socklen_t from_len = (socklen_t)sizeof(from_addr);
-      int n = (int)recvfrom(sock,
-                            buf,
-                            sizeof(buf) - 1,
-                            0,
-                            (struct sockaddr *)&from_addr,
-                            &from_len);
+      int n;
+
+#if defined(__human68k__)
+      /* X68000 / Human68k / elf2x68k:
+       * Use SO_SOCKLENRECV to poll receive buffer instead of O_NONBLOCK.
+       */
+      {
+        int avail = 0;
+        socklen_t optlen = (socklen_t)sizeof(avail);
+        if (getsockopt(sock, 0, SO_SOCKLENRECV, &avail, &optlen) != 0) {
+          /* If this fails, just break; no data or not supported */
+          /* perror("getsockopt(SO_SOCKLENRECV)"); */
+          break;
+        }
+        if (avail <= 0) {
+          /* No data available: behave like non-blocking with EWOULDBLOCK */
+          break;
+        }
+      }
+
+      n = (int)recvfrom(sock,
+                        buf,
+                        sizeof(buf) - 1,
+                        0,
+                        (struct sockaddr *)&from_addr,
+                        &from_len);
+
+      if (n <= 0) {
+        /* Any error here is fatal for this simple demo */
+        perror("recvfrom (X68000)");
+        break;
+      }
+
+#else  /* !__human68k__ */
+
+      n = (int)recvfrom(sock,
+                        buf,
+                        sizeof(buf) - 1,
+                        0,
+                        (struct sockaddr *)&from_addr,
+                        &from_len);
+
       if (n < 0) {
 #if defined(_WIN32)
         int err = WSAGetLastError();
         if (err == WSAEWOULDBLOCK) {
-          break;  /* no more data */
+          /* no more data */
+          break;
         }
         fprintf(stderr, "recvfrom() error: %d\n", err);
         break;
 #else
         if (errno == EWOULDBLOCK || errno == EAGAIN) {
-          break;  /* no more data */
+          /* no more data */
+          break;
         }
         perror("recvfrom");
         break;
@@ -208,13 +260,15 @@ int main(int argc, char **argv)
       } else if (n == 0) {
         /* No data (not very meaningful for UDP) */
         break;
-      } else {
-        buf[n] = '\0';
-        printf("RECV from %s:%d: %s\n",
-               inet_ntoa(from_addr.sin_addr),
-               (int)ntohs(from_addr.sin_port),
-               buf);
       }
+#endif /* __human68k__ */
+
+      /* n > 0 here */
+      buf[n] = '\0';
+      printf("RECV from %s:%d: %s\n",
+             inet_ntoa(from_addr.sin_addr),
+             (int)ntohs(from_addr.sin_port),
+             buf);
     }
 
     /* Send once per second */
